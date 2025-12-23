@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <title>Coursera VTT Loader</title>
+  <style>
+    body {
+      width: 350px;
+      padding: 10px;
+      font-family: Arial, sans-serif;
+    }
+
+    textarea {
+      width: 100%;
+      height: 150px;
+      box-sizing: border-box;
+      margin-bottom: 10px;
+      resize: vertical;
+    }
+
+    button {
+      width: 100%;
+      padding: 8px;
+      background-color: #0056D2;
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    button:hover {
+      background-color: #00419e;
+    }
+
+    .status {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #555;
+    }
+  </style>
+</head>
+
+<body>
+  <h3>Load Custom Subtitles</h3>
+  <textarea id="vttInput" placeholder="Paste WebVTT content here..."></textarea>
+  <button id="loadBtn">Load Subtitles</button>
+  <button id="extractBtn" style="margin-top: 5px; background-color: #4CAF50;">Extract from Video</button>
+
+  <hr>
+
+  <h3>AI Translation</h3>
+  <label for="provider">Provider:</label>
+  <select id="provider" style="width: 100%; margin-bottom: 5px;">
+    <option value="openai">OpenAI</option>
+    <option value="gemini">Google Gemini</option>
+  </select>
+
+  <label for="apiKey">API Key:</label>
+  <input type="password" id="apiKey" placeholder="sk-..."
+    style="width: 100%; margin-bottom: 5px; box-sizing: border-box;">
+
+  <label for="targetLang">Target Language:</label>
+  <input type="text" id="targetLang" placeholder="e.g. Vietnamese" value="Vietnamese"
+    style="width: 100%; margin-bottom: 5px; box-sizing: border-box;">
+
+  <button id="translateBtn" style="background-color: #FF9800;">Translate VTT</button>
+
+  <div id="status" class="status"></div>
+  <script src="popup.js"></script>
+</body>
+
+</html>

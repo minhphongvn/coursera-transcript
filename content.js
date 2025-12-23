@@ -248,167 +248,7 @@ let currentTTSSegment = null; // Track currently spoken segment
 
 // ========== EDGE TTS CLIENT ==========
 
-class EdgeTTS {
-    constructor() {
-        this.ws = null;
-        this.audioContext = null;
-        this.audioQueue = [];
-        this.isPlaying = false;
-        this.onStart = null;
-        this.onEnd = null;
-    }
-
-    async speak(text, voice = 'vi-VN-HoaiMyNeural', rate = 1.0) {
-        return new Promise((resolve, reject) => {
-            try {
-                // Initialize AudioContext
-                if (!this.audioContext) {
-                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                }
-
-                // Clear previous audio
-                this.stop();
-                this.audioQueue = [];
-
-                // Generate unique identifiers
-                const requestId = this.generateUUID();
-                const timestamp = Date.now();
-
-                // Connect to Edge TTS WebSocket
-                const wsUrl = 'wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=6A5AA1D4EAFF4E9FB37E23D68491D6F4';
-
-                this.ws = new WebSocket(wsUrl);
-                this.ws.binaryType = 'arraybuffer';
-
-                // Connection opened
-                this.ws.onopen = () => {
-                    console.log('Edge TTS: WebSocket connected');
-
-                    // Send configuration message
-                    const configMsg = `X-Timestamp:${new Date().toISOString()}\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":"false","wordBoundaryEnabled":"false"},"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}`;
-                    this.ws.send(configMsg);
-
-                    // Create SSML with rate adjustment
-                    const ratePct = Math.round((rate - 1) * 100);
-                    const rateStr = ratePct >= 0 ? `+${ratePct}%` : `${ratePct}%`;
-
-                    const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='vi-VN'><voice name='${voice}'><prosody rate='${rateStr}'>${this.escapeXML(text)}</prosody></voice></speak>`;
-
-                    // Send SSML message
-                    const ssmlMsg = `X-RequestId:${requestId}\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:${new Date().toISOString()}Z\r\nPath:ssml\r\n\r\n${ssml}`;
-                    this.ws.send(ssmlMsg);
-                };
-
-                // Handle incoming messages
-                this.ws.onmessage = async (event) => {
-                    if (typeof event.data === 'string') {
-                        // Text message (metadata)
-                        if (event.data.includes('Path:turn.start')) {
-                            if (this.onStart) this.onStart();
-                        } else if (event.data.includes('Path:turn.end')) {
-                            // All audio received, start playback
-                            await this.playAudioQueue();
-                            if (this.onEnd) this.onEnd();
-                            this.ws.close();
-                            resolve();
-                        }
-                    } else {
-                        // Binary message (audio data)
-                        const audioData = this.parseAudioData(event.data);
-                        if (audioData) {
-                            this.audioQueue.push(audioData);
-                        }
-                    }
-                };
-
-                this.ws.onerror = (error) => {
-                    console.error('Edge TTS WebSocket error:', error);
-                    reject(new Error('Edge TTS connection failed'));
-                };
-
-                this.ws.onclose = () => {
-                    console.log('Edge TTS: WebSocket closed');
-                };
-
-            } catch (error) {
-                console.error('Edge TTS error:', error);
-                reject(error);
-            }
-        });
-    }
-
-    parseAudioData(arrayBuffer) {
-        // Edge TTS sends audio in a specific format
-        // Skip the header (first 2 bytes indicate header length)
-        const view = new DataView(arrayBuffer);
-        const headerLength = view.getUint16(0, false);
-
-        if (headerLength >= arrayBuffer.byteLength) {
-            return null;
-        }
-
-        // Extract audio data (skip header + 2 bytes)
-        return arrayBuffer.slice(headerLength + 2);
-    }
-
-    async playAudioQueue() {
-        if (this.audioQueue.length === 0) return;
-
-        // Concatenate all audio chunks
-        const totalLength = this.audioQueue.reduce((sum, arr) => sum + arr.byteLength, 0);
-        const combined = new Uint8Array(totalLength);
-        let offset = 0;
-
-        for (const chunk of this.audioQueue) {
-            combined.set(new Uint8Array(chunk), offset);
-            offset += chunk.byteLength;
-        }
-
-        // Decode and play
-        try {
-            const audioBuffer = await this.audioContext.decodeAudioData(combined.buffer);
-            const source = this.audioContext.createBufferSource();
-            source.buffer = audioBuffer;
-            source.connect(this.audioContext.destination);
-            source.start(0);
-
-            this.isPlaying = true;
-            source.onended = () => {
-                this.isPlaying = false;
-            };
-        } catch (error) {
-            console.error('Error decoding audio:', error);
-        }
-    }
-
-    stop() {
-        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            this.ws.close();
-        }
-        if (this.audioContext) {
-            this.audioContext.suspend();
-        }
-        this.isPlaying = false;
-        this.audioQueue = [];
-    }
-
-    escapeXML(text) {
-        return text
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&apos;');
-    }
-
-    generateUUID() {
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-            const r = Math.random() * 16 | 0;
-            const v = c === 'x' ? r : (r & 0x3 | 0x8);
-            return v.toString(16);
-        });
-    }
-}
+// EdgeTTS removed as requested. Using Web Speech API.
 
 // TTS variables
 let ttsEnabled = false;
@@ -436,8 +276,11 @@ function createUIPanel() {
     </div>
     
     <div id="vtt-panel-content">
+      <textarea id="vtt-input" class="vtt-panel-textarea" placeholder="Paste WebVTT content here..."></textarea>
+
       <div class="vtt-actions">
         <button class="vtt-btn vtt-btn-extract" id="vtt-extract">📥 Extract</button>
+        <button class="vtt-btn vtt-btn-copy-prompt" id="vtt-copy-prompt">📋 Copy Prompt</button>
         <button class="vtt-btn vtt-btn-translate" id="vtt-translate">🌐 Translate</button>
         <button class="vtt-btn vtt-btn-load" id="vtt-load">▶️ Load</button>
       </div>
@@ -485,21 +328,6 @@ function createUIPanel() {
           </span>
         </div>
         <div class="vtt-tts-controls" id="vtt-tts-controls" style="display: none;">
-          <div class="vtt-tts-control">
-            <label>
-              <input type="checkbox" id="vtt-edge-tts-checkbox" style="width: auto; margin-right: 4px;">
-              Use Edge TTS (Tiếng Việt tốt hơn)
-            </label>
-          </div>
-          
-          <div class="vtt-tts-control" id="vtt-edge-voice-group" style="display: none;">
-            <label>Giọng:< /label>
-            <select id="vtt-edge-voice">
-              <option value="vi-VN-HoaiMyNeural">Hoài My (Nữ - Miền Bắc)</option>
-              <option value="vi-VN-NamMinhNeural">Nam Minh (Nam - Miền Nam)</option>
-            </select>
-          </div>
-          
           <div class="vtt-tts-control" id="vtt-web-voice-group">
             <label>Voice:</label>
             <select id="vtt-tts-voice"></select>
@@ -541,14 +369,11 @@ function attachUIHandlers() {
         content.classList.toggle('hidden');
     });
 
-    // Extract button
+    // Action buttons
     document.getElementById('vtt-extract').addEventListener('click', handleExtract);
-
-    // Translate button
     document.getElementById('vtt-translate').addEventListener('click', handleTranslate);
-
-    // Load button
     document.getElementById('vtt-load').addEventListener('click', handleLoad);
+    document.getElementById('vtt-copy-prompt').addEventListener('click', handleCopyPrompt);
 
     // TTS toggle
     document.getElementById('vtt-tts-switch').addEventListener('click', toggleTTS);
@@ -576,17 +401,18 @@ function attachUIHandlers() {
         saveTTSSettings();
     });
 
-    // Edge TTS checkbox
-    document.getElementById('vtt-edge-tts-checkbox').addEventListener('change', (e) => {
-        useEdgeTTS = e.target.checked;
-        updateTTSUI();
-        saveTTSSettings();
+    // VTT Input change
+    document.getElementById('vtt-input').addEventListener('input', (e) => {
+        currentVTT = e.target.value;
+        // Debounce save? For now just save on every input or maybe on blur.
+        // Let's safe on blur to avoid too many writes, but update currentVTT immediately.
     });
 
-    // Edge TTS voice selection
-    document.getElementById('vtt-edge-voice').addEventListener('change', (e) => {
-        edgeVoice = e.target.value;
-        saveTTSSettings();
+    document.getElementById('vtt-input').addEventListener('blur', async () => {
+        if (currentVTT) {
+            await saveVTTForModule(currentVTT);
+            console.log('Saved VTT from textarea edit');
+        }
     });
 
     // Save settings on change
@@ -631,6 +457,7 @@ async function handleExtract() {
 
         if (vttText) {
             currentVTT = vttText;
+            document.getElementById('vtt-input').value = vttText; // Sync to textarea
             await saveVTTForModule(vttText);
             setStatus(`✓ Đã trích xuất ${vttText.split('\n').length} dòng`, 'success');
             setProgress(true, 100);
@@ -767,7 +594,9 @@ async function handleTranslate() {
         const originalVTT = currentVTT;
         translated = fixVTTTimestamps(originalVTT, translated);
 
+        // Result is already fixed, update UI
         currentVTT = translated;
+        document.getElementById('vtt-input').value = translated; // Sync to textarea
         await saveVTTForModule(translated);
         setStatus('✓ Dịch thành công!', 'success');
         setProgress(true, 100);
@@ -776,6 +605,45 @@ async function handleTranslate() {
         console.error('Translation error:', error);
         setStatus('Lỗi dịch: ' + error.message, 'error');
         setProgress(false);
+    }
+}
+
+async function handleCopyPrompt() {
+    if (!currentVTT) {
+        setStatus('Vui lòng Extract trước!', 'warning');
+        return;
+    }
+
+    const targetLang = document.getElementById('vtt-target-lang').value || 'Vietnamese';
+    const courseContext = getCourseContext();
+
+    let contextInfo = `Course: ${courseContext.title}`;
+    if (courseContext.topic) {
+        contextInfo += `\nCategory: ${courseContext.topic}`;
+    }
+
+    const prompt = `Translate the following educational course subtitles to ${targetLang}.
+
+**Course Context:**
+${contextInfo}
+
+**Instructions:**
+- **CRITICAL:** Translate concisely. The translated text length must be close to the original to ensure Text-to-Speech (TTS) synchronization.
+- Avoid expanding sentences; prefer shorter synonyms where accurate.
+- Translate technical terms accurately based on the course subject.
+- Keep WEBVTT header and all timestamps (HH:MM:SS.mmm --> HH:MM:SS.mmm) EXACTLY as they are.
+- Use appropriate professional terminology for this field.
+
+**Content to translate:**
+
+${currentVTT}`;
+
+    try {
+        await navigator.clipboard.writeText(prompt);
+        setStatus('📋 Đã copy prompt!', 'success');
+    } catch (err) {
+        console.error('Failed to copy prompt:', err);
+        setStatus('Lỗi copy prompt', 'error');
     }
 }
 
@@ -1010,6 +878,11 @@ async function autoLoadVTT() {
         const result = await chrome.storage.local.get([`vtt_${moduleId}`]);
         if (result[`vtt_${moduleId}`]) {
             currentVTT = result[`vtt_${moduleId}`];
+
+            // Sync to textarea if panel exists
+            const input = document.getElementById('vtt-input');
+            if (input) input.value = currentVTT;
+
             setStatus('📂 Đã tải VTT đã lưu', 'success');
             console.log('Auto-loaded VTT for module:', moduleId);
         }
@@ -1207,8 +1080,6 @@ function updateTTSIndicator(speaking) {
 function saveTTSSettings() {
     chrome.storage.local.set({
         ttsEnabled: ttsEnabled,
-        useEdgeTTS: useEdgeTTS,
-        edgeVoice: edgeVoice,
         ttsRate: ttsRate,
         ttsVoiceIndex: ttsVoice ? speechSynthesis.getVoices().indexOf(ttsVoice) : 0
     });
@@ -1222,18 +1093,7 @@ function loadTTSSettings() {
             document.getElementById('vtt-tts-controls').style.display = ttsEnabled ? 'flex' : 'none';
         }
 
-        if (result.useEdgeTTS !== undefined) {
-            useEdgeTTS = result.useEdgeTTS;
-            const edgeCheckbox = document.getElementById('vtt-edge-tts-checkbox');
-            if (edgeCheckbox) edgeCheckbox.checked = useEdgeTTS;
-            updateTTSUI();
-        }
-
-        if (result.edgeVoice) {
-            edgeVoice = result.edgeVoice;
-            const edgeVoiceSelect = document.getElementById('vtt-edge-voice');
-            if (edgeVoiceSelect) edgeVoiceSelect.value = result.edgeVoice;
-        }
+        // Removed EdgeTTS settings loading
 
         if (result.ttsRate) {
             ttsRate = result.ttsRate;
@@ -1251,28 +1111,51 @@ function loadTTSSettings() {
     });
 }
 
-function updateTTSUI() {
-    const webVoiceGroup = document.getElementById('vtt-web-voice-group');
-    const edgeVoiceGroup = document.getElementById('vtt-edge-voice-group');
-
-    if (webVoiceGroup) webVoiceGroup.style.display = useEdgeTTS ? 'none' : 'flex';
-    if (edgeVoiceGroup) edgeVoiceGroup.style.display = useEdgeTTS ? 'flex' : 'none';
-}
+// function updateTTSUI removed
 
 
 // Initialize UI when page is ready
+let lastUrl = window.location.href;
+
 function initWhenReady() {
     console.log('=== Initializing VTT Panel ===');
     console.log('Document ready state:', document.readyState);
     console.log('Body exists:', !!document.body);
 
     if (document.body) {
-        createUIPanel();
-        console.log('VTT Panel created! Check bottom-right corner.');
+        if (!uiPanel) {
+            createUIPanel();
+            console.log('VTT Panel created! Check bottom-right corner.');
+        }
+
+        // Start URL monitoring
+        setInterval(() => {
+            const currentUrl = window.location.href;
+            if (currentUrl !== lastUrl) {
+                console.log('URL changed:', lastUrl, '->', currentUrl);
+                lastUrl = currentUrl;
+                handleUrlChange();
+            }
+        }, 1000);
+
     } else {
         console.log('Body not ready, waiting...');
         setTimeout(initWhenReady, 500);
     }
+}
+
+async function handleUrlChange() {
+    // Clear current state
+    currentVTT = '';
+    const input = document.getElementById('vtt-input');
+    if (input) input.value = '';
+    setStatus('New page detected', 'info');
+
+    // Try to load VTT for new module
+    await autoLoadVTT();
+
+    // Attempt to re-extract if auto-load found nothing? 
+    // Maybe better to let user extract manually to avoid issues.
 }
 
 if (document.readyState === 'loading') {

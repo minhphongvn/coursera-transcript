@@ -114,6 +114,11 @@
   color: white;
 }
 
+.vtt-btn-copy-prompt {
+  background: #009688;
+  color: white;
+}
+
 .vtt-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -211,6 +216,24 @@
 
 .vtt-settings-toggle:hover {
   text-decoration: underline;
+}
+
+.vtt-panel-textarea {
+  width: 100%;
+  height: 120px;
+  box-sizing: border-box;
+  margin-bottom: 12px;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-family: monospace;
+  font-size: 11px;
+  resize: vertical;
+}
+
+.vtt-panel-textarea:focus {
+  outline: none;
+  border-color: #0056D2;
 }
 
 .vtt-settings-content {
